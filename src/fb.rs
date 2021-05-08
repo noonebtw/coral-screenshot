@@ -58,15 +58,15 @@ impl GenericImageView for FrameBufferBackend {
 impl GenericImage for FrameBufferBackend {
     type InnerImage = Self;
 
-    fn get_pixel_mut(&mut self, x: u32, y: u32) -> &mut Self::Pixel {
+    fn get_pixel_mut(&mut self, _x: u32, _y: u32) -> &mut Self::Pixel {
         todo!()
     }
 
-    fn put_pixel(&mut self, x: u32, y: u32, pixel: Self::Pixel) {
+    fn put_pixel(&mut self, _x: u32, _y: u32, _pixel: Self::Pixel) {
         todo!()
     }
 
-    fn blend_pixel(&mut self, x: u32, y: u32, pixel: Self::Pixel) {
+    fn blend_pixel(&mut self, _x: u32, _y: u32, _pixel: Self::Pixel) {
         todo!()
     }
 

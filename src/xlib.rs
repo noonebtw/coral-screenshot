@@ -5,10 +5,7 @@ use std::{
     rc::Rc,
 };
 
-use image::{
-    error::ParameterError, DynamicImage, GenericImage, GenericImageView, ImageError, ImageResult,
-    Pixel, Rgba,
-};
+use image::{DynamicImage, GenericImage, GenericImageView, ImageError, ImageResult, Pixel, Rgba};
 use x11::{
     xlib::{
         self, IncludeInferiors, True, Window, XCreatePixmap, XDefaultScreen, XGetImage, XGetPixel,
