@@ -1,6 +1,14 @@
-use std::{any::Any, cell::RefCell, ptr::null, rc::Rc};
+use std::{
+    cell::RefCell,
+    io::{Error, ErrorKind::InvalidData},
+    ptr::null,
+    rc::Rc,
+};
 
-use image::{GenericImage, GenericImageView, ImageBuffer, Pixel, Rgba, RgbaImage};
+use image::{
+    error::ParameterError, DynamicImage, GenericImage, GenericImageView, ImageError, ImageResult,
+    Pixel, Rgba,
+};
 use x11::{
     xlib::{
         self, IncludeInferiors, True, Window, XCreatePixmap, XDefaultScreen, XGetImage, XGetPixel,
@@ -13,6 +21,8 @@ use x11::{
         XRenderFindVisualFormat, XRenderPictureAttributes, XRenderQueryVersion,
     },
 };
+
+use crate::traits::{GlobalScreenshotBackend, PerWindowScreenshotBackend};
 
 #[derive(Debug)]
 struct Display(Rc<*mut xlib::Display>);
@@ -54,6 +64,7 @@ impl<T> XLibMut<T> {
         unsafe { &mut *self.0.as_ref().borrow().0 }
     }
 
+    #[allow(dead_code)]
     pub unsafe fn as_ptr(&self) -> *const T {
         self.0.as_ref().borrow().0
     }
@@ -77,13 +88,13 @@ impl Display {
     }
 }
 
-struct XLibState {
+pub struct XLibState {
     display: Display,
     root: Window,
 }
 
 impl XLibState {
-    fn new() -> Option<Self> {
+    pub fn new() -> Option<Self> {
         let display = Display::new(unsafe { XOpenDisplay(null()) })?;
         let root = unsafe { XRootWindow(display.get(), XDefaultScreen(display.get())) };
 
@@ -117,8 +128,40 @@ impl XLibState {
         Some((wa.width, wa.height))
     }
 
-    fn get_screenshot(&self) -> Option<XLibMut<XImage>> {
-        let wa = self.get_window_attributes(self.root)?;
+    // pub fn get_fullscreen_image(&self) -> ImageResult<DynamicImage> {
+    //     let ximage = self
+    //         .get_screenshot_inner(self.root)
+    //         .ok_or(ImageError::IoError(Error::new(
+    //             InvalidData,
+    //             "Failed to aquire screen image",
+    //         )))?;
+
+    //     let img = ximage
+    //         .view(0, 0, ximage.width(), ximage.height())
+    //         .to_image();
+
+    //     Ok(DynamicImage::ImageRgba8(img))
+    // }
+
+    // pub fn get_window_image(&self, window: Window) -> ImageResult<DynamicImage> {
+    //     let ximage = self
+    //         .get_screenshot_inner(window)
+    //         .ok_or(ImageError::IoError(Error::new(
+    //             InvalidData,
+    //             "Failed to aquire screen image",
+    //         )))?;
+
+    //     let img = ximage
+    //         .view(0, 0, ximage.width(), ximage.height())
+    //         .to_image();
+
+    //     Ok(DynamicImage::ImageRgba8(img))
+    // }
+
+    fn get_screenshot_inner(&self, window: Window) -> Option<XLibMut<XImage>> {
+        assert_eq!(self.has_xrender(), true);
+
+        let wa = self.get_window_attributes(window)?;
 
         let format = unsafe { XRenderFindVisualFormat(self.dpy(), wa.visual).as_mut()? };
         let has_alpha = format.type_ == PictTypeDirect && format.direct.alphaMask != 0;
@@ -130,14 +173,14 @@ impl XLibState {
         let picture = unsafe {
             XRenderCreatePicture(
                 self.dpy(),
-                self.root,
+                window,
                 format as *mut _,
                 CPSubwindowMode as u64,
                 &mut pa,
             )
         };
 
-        let (width, height) = self.get_window_dimensions(self.root)?;
+        let (width, height) = self.get_window_dimensions(window)?;
         let (width, height) = (width as u32, height as u32);
 
         let pixmap = unsafe { XCreatePixmap(self.dpy(), self.root, width, height, 32) };
@@ -272,7 +315,7 @@ impl XLibMut<XImage> {
 impl GenericImage for XLibMut<XImage> {
     type InnerImage = Self;
 
-    fn get_pixel_mut(&mut self, x: u32, y: u32) -> &mut Self::Pixel {
+    fn get_pixel_mut(&mut self, _x: u32, _y: u32) -> &mut Self::Pixel {
         todo!()
     }
 
@@ -288,7 +331,7 @@ impl GenericImage for XLibMut<XImage> {
         }
     }
 
-    fn blend_pixel(&mut self, x: u32, y: u32, pixel: Self::Pixel) {
+    fn blend_pixel(&mut self, _x: u32, _y: u32, _pixel: Self::Pixel) {
         todo!()
     }
 
@@ -297,18 +340,43 @@ impl GenericImage for XLibMut<XImage> {
     }
 }
 
-pub fn asdf() -> Option<()> {
-    let x = XLibState::new()?;
+impl GlobalScreenshotBackend for XLibState {
+    fn get_global_screenshot(&self) -> ImageResult<DynamicImage> {
+        let ximage = self
+            .get_screenshot_inner(self.root)
+            .ok_or(ImageError::IoError(Error::new(
+                InvalidData,
+                "Failed to aquire screen image",
+            )))?;
 
-    println!("has xrender: {}", x.has_xrender());
+        let img = ximage
+            .view(0, 0, ximage.width(), ximage.height())
+            .to_image();
 
-    let sc = x.get_screenshot()?;
+        Ok(DynamicImage::ImageRgba8(img))
+    }
+}
 
-    let img = sc.view(0, 0, sc.width(), sc.height()).to_image();
+impl PerWindowScreenshotBackend for XLibState {
+    fn get_screenshot(&self, window_id: &str) -> ImageResult<DynamicImage> {
+        let window = u64::from_str_radix(window_id.trim_start_matches("0x"), 16).map_err(|_| {
+            ImageError::IoError(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "failed to parse window_id.",
+            ))
+        })?;
 
-    let res = img.save("test.png");
+        let ximage = self
+            .get_screenshot_inner(window)
+            .ok_or(ImageError::IoError(Error::new(
+                InvalidData,
+                "Failed to aquire screen image",
+            )))?;
 
-    println!("{:?}", res);
+        let img = ximage
+            .view(0, 0, ximage.width(), ximage.height())
+            .to_image();
 
-    todo!()
+        Ok(DynamicImage::ImageRgba8(img))
+    }
 }
