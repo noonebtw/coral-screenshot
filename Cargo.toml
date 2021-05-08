@@ -1,0 +1,14 @@
+[package]
+name = "coral"
+version = "0.1.0"
+authors = ["NoOneBtw <noonebtw@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+x11 = {version = "2.18.2", features = ["xlib", "xrender"] }
+log = "0.4.13"
+image = "0.23.14"
+simple_logger = "1.11.0"
