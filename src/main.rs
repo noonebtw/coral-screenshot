@@ -79,5 +79,7 @@ fn fb_screenshot() -> ImageResult<DynamicImage> {
     let fb = FrameBufferBackend::new()
         .map_err(|err| ImageError::IoError(std::io::Error::new(std::io::ErrorKind::Other, err)))?;
 
+    println!("{:#?}", fb);
+
     fb.get_global_screenshot()
 }

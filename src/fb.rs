@@ -35,19 +35,25 @@ impl GenericImageView for FrameBufferBackend {
     }
 
     fn get_pixel(&self, x: u32, y: u32) -> Self::Pixel {
-        let bpp = self.0.var_screen_info.bits_per_pixel / 8;
-        let line = self.0.fix_screen_info.line_length;
-        let x_offset = self.0.var_screen_info.xoffset;
+        let var_info = &self.0.var_screen_info;
+        let fix_info = &self.0.fix_screen_info;
+
+        let bytes_per_pixel = var_info.bits_per_pixel / 8;
+        let line = fix_info.line_length;
+        let x_offset = var_info.xoffset;
 
         let frame = self.0.read_frame();
 
-        let px_start = (y * line + x * bpp + x_offset) as usize;
+        let px_idx = (y * line + x * bytes_per_pixel + x_offset) as usize;
 
-        let r = frame[px_start + 0];
-        let b = frame[px_start + 1];
-        let g = frame[px_start + 2];
+        let px = unsafe { (frame.as_ptr().add(px_idx) as *const usize).read() };
 
-        Self::Pixel::from_channels(r as u8, g as u8, b as u8, 0u8)
+        let r = (px >> var_info.red.offset) & ((1 << var_info.red.length) - 1);
+        let g = (px >> var_info.green.offset) & ((1 << var_info.green.length) - 1);
+        let b = (px >> var_info.blue.offset) & ((1 << var_info.blue.length) - 1);
+        let a = (px >> var_info.transp.offset) & ((1 << var_info.transp.length) - 1);
+
+        Self::Pixel::from_channels(r as u8, g as u8, b as u8, a as u8)
     }
 
     fn inner(&self) -> &Self::InnerImageView {
