@@ -1,12 +1,12 @@
+use std::io::{Error, ErrorKind};
+
 use clap::{App, Arg};
 use fb::FrameBufferBackend;
 use image::{DynamicImage, ImageError, ImageResult};
 use log::info;
+use traits::Backend;
 
-use crate::{
-    traits::{GlobalScreenshotBackend, PerWindowScreenshotBackend},
-    xlib::XLibState,
-};
+use crate::{traits::ScreenshotBackend, xlib::XLibState};
 
 mod fb;
 mod traits;
@@ -50,11 +50,7 @@ fn main() -> Result<(), ImageError> {
     let backend = matches.value_of("backend");
 
     info!("getting screenshot.. [backend = \"{}\"]", backend.unwrap());
-    let image = match matches.value_of("backend") {
-        Some("fb") => fb_screenshot(),
-        Some("xlib") => xlib_screenshot(window),
-        _ => xlib_screenshot(window),
-    }?;
+    let image = screenshot(backend.into(), window)?;
 
     let image_name = matches.value_of("filename").unwrap();
     info!("saving as {}", image_name);
@@ -63,23 +59,19 @@ fn main() -> Result<(), ImageError> {
     Ok(())
 }
 
-fn xlib_screenshot(window: Option<&str>) -> ImageResult<DynamicImage> {
-    let x = XLibState::new().expect("failed to init xlib state.");
-
-    match window {
-        Some(id) => {
-            info!("window: {}", id);
-            x.get_screenshot(id)
+fn screenshot(backend: Backend, window: Option<&str>) -> ImageResult<DynamicImage> {
+    let backend: Box<dyn ScreenshotBackend> = match backend {
+        Backend::FrameBuffer => Box::new(
+            FrameBufferBackend::new()
+                .map_err(|e| ImageError::IoError(Error::new(ErrorKind::Other, e)))?,
+        ),
+        Backend::XLib | Backend::Default => {
+            Box::new(XLibState::new().ok_or(ImageError::IoError(Error::new(
+                ErrorKind::Other,
+                "Failed to connect to X server.",
+            )))?)
         }
-        None => x.get_global_screenshot(),
-    }
-}
+    };
 
-fn fb_screenshot() -> ImageResult<DynamicImage> {
-    let fb = FrameBufferBackend::new()
-        .map_err(|err| ImageError::IoError(std::io::Error::new(std::io::ErrorKind::Other, err)))?;
-
-    println!("{:#?}", fb);
-
-    fb.get_global_screenshot()
+    backend.screenshot(window)
 }

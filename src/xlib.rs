@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    io::{Error, ErrorKind::InvalidData},
+    io::{Error, ErrorKind},
     ptr::null,
     rc::Rc,
 };
@@ -19,7 +19,7 @@ use x11::{
     },
 };
 
-use crate::traits::{GlobalScreenshotBackend, PerWindowScreenshotBackend};
+use crate::traits::ScreenshotBackend;
 
 #[derive(Debug)]
 struct Display(Rc<*mut xlib::Display>);
@@ -337,12 +337,12 @@ impl GenericImage for XLibMut<XImage> {
     }
 }
 
-impl GlobalScreenshotBackend for XLibState {
-    fn get_global_screenshot(&self) -> ImageResult<DynamicImage> {
+impl ScreenshotBackend for XLibState {
+    fn global_screenshot(&self) -> ImageResult<DynamicImage> {
         let ximage = self
             .get_screenshot_inner(self.root)
             .ok_or(ImageError::IoError(Error::new(
-                InvalidData,
+                ErrorKind::InvalidData,
                 "Failed to aquire screen image",
             )))?;
 
@@ -352,10 +352,8 @@ impl GlobalScreenshotBackend for XLibState {
 
         Ok(DynamicImage::ImageRgba8(img))
     }
-}
 
-impl PerWindowScreenshotBackend for XLibState {
-    fn get_screenshot(&self, window_id: &str) -> ImageResult<DynamicImage> {
+    fn window_screenshot(&self, window_id: &str) -> ImageResult<DynamicImage> {
         let window = u64::from_str_radix(window_id.trim_start_matches("0x"), 16).map_err(|_| {
             ImageError::IoError(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -366,7 +364,7 @@ impl PerWindowScreenshotBackend for XLibState {
         let ximage = self
             .get_screenshot_inner(window)
             .ok_or(ImageError::IoError(Error::new(
-                InvalidData,
+                ErrorKind::InvalidData,
                 "Failed to aquire screen image",
             )))?;
 

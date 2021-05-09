@@ -1,7 +1,9 @@
-use framebuffer::{Framebuffer, FramebufferError};
-use image::{DynamicImage, GenericImage, GenericImageView, Pixel, Rgb};
+use std::io::{Error, ErrorKind};
 
-use crate::traits::GlobalScreenshotBackend;
+use framebuffer::{Framebuffer, FramebufferError};
+use image::{DynamicImage, GenericImage, GenericImageView, ImageError, Pixel, Rgb};
+
+use crate::traits::ScreenshotBackend;
 
 /// Framebuffer backend.
 #[derive(Debug)]
@@ -81,10 +83,17 @@ impl GenericImage for FrameBufferBackend {
     }
 }
 
-impl GlobalScreenshotBackend for FrameBufferBackend {
-    fn get_global_screenshot(&self) -> image::ImageResult<image::DynamicImage> {
+impl ScreenshotBackend for FrameBufferBackend {
+    fn global_screenshot(&self) -> image::ImageResult<image::DynamicImage> {
         Ok(DynamicImage::ImageRgb8(
             self.view(0, 0, self.width(), self.height()).to_image(),
         ))
+    }
+
+    fn window_screenshot(&self, _: &str) -> image::ImageResult<DynamicImage> {
+        Err(ImageError::IoError(Error::new(
+            ErrorKind::Other,
+            "framebuffer backend doesn\'t support per window screencapture.",
+        )))
     }
 }
