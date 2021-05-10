@@ -11,19 +11,3 @@ pub trait ScreenshotBackend {
         }
     }
 }
-
-pub enum Backend {
-    XLib,
-    FrameBuffer,
-    Default,
-}
-
-impl From<Option<&str>> for Backend {
-    fn from(name: Option<&str>) -> Self {
-        match name {
-            Some("fb") => Self::FrameBuffer,
-            Some("xlib") => Self::XLib,
-            _ => Self::Default,
-        }
-    }
-}

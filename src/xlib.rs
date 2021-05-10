@@ -125,36 +125,6 @@ impl XLibState {
         Some((wa.width, wa.height))
     }
 
-    // pub fn get_fullscreen_image(&self) -> ImageResult<DynamicImage> {
-    //     let ximage = self
-    //         .get_screenshot_inner(self.root)
-    //         .ok_or(ImageError::IoError(Error::new(
-    //             InvalidData,
-    //             "Failed to aquire screen image",
-    //         )))?;
-
-    //     let img = ximage
-    //         .view(0, 0, ximage.width(), ximage.height())
-    //         .to_image();
-
-    //     Ok(DynamicImage::ImageRgba8(img))
-    // }
-
-    // pub fn get_window_image(&self, window: Window) -> ImageResult<DynamicImage> {
-    //     let ximage = self
-    //         .get_screenshot_inner(window)
-    //         .ok_or(ImageError::IoError(Error::new(
-    //             InvalidData,
-    //             "Failed to aquire screen image",
-    //         )))?;
-
-    //     let img = ximage
-    //         .view(0, 0, ximage.width(), ximage.height())
-    //         .to_image();
-
-    //     Ok(DynamicImage::ImageRgba8(img))
-    // }
-
     fn get_screenshot_inner(&self, window: Window) -> Option<XLibMut<XImage>> {
         assert_eq!(self.has_xrender(), true);
 
@@ -250,6 +220,24 @@ impl XLibState {
     }
 }
 
+impl XLibMut<XImage> {
+    fn red_offset(&self) -> u32 {
+        self.as_ref().red_mask.trailing_zeros()
+    }
+
+    fn green_offset(&self) -> u32 {
+        self.as_ref().green_mask.trailing_zeros()
+    }
+
+    fn blue_offset(&self) -> u32 {
+        self.as_ref().blue_mask.trailing_zeros()
+    }
+
+    fn alpha_offset(&self) -> u32 {
+        !(self.red_offset() | self.green_offset() | self.blue_offset())
+    }
+}
+
 impl GenericImageView for XLibMut<XImage> {
     type Pixel = Rgba<u8>;
 
@@ -288,24 +276,6 @@ impl GenericImageView for XLibMut<XImage> {
 
     fn inner(&self) -> &Self::InnerImageView {
         self
-    }
-}
-
-impl XLibMut<XImage> {
-    fn red_offset(&self) -> u32 {
-        self.as_ref().red_mask.trailing_zeros()
-    }
-
-    fn green_offset(&self) -> u32 {
-        self.as_ref().green_mask.trailing_zeros()
-    }
-
-    fn blue_offset(&self) -> u32 {
-        self.as_ref().blue_mask.trailing_zeros()
-    }
-
-    fn alpha_offset(&self) -> u32 {
-        !(self.red_offset() | self.green_offset() | self.blue_offset())
     }
 }
 
